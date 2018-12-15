@@ -131,6 +131,7 @@ type People {
     An array of vehicle resources that this person has piloted.
     """
     vehicles: [Vehicle]
+    filmConnection(first: Int, after: ID): FilmConnection!
 }
 
 """

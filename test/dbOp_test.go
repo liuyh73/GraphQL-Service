@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	service "github.com/Go-GraphQL-Group/GraphQL-Service"
 	"github.com/boltdb/bolt"
+	service "github.com/liuyh73/GraphQL-Service"
 )
 
 func TestGetFilmByID(t *testing.T) {

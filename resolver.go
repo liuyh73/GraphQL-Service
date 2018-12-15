@@ -14,8 +14,71 @@ import (
 
 type Resolver struct{}
 
+func (r *Resolver) People() PeopleResolver {
+	return &peopleResolver{r}
+}
 func (r *Resolver) Query() QueryResolver {
 	return &queryResolver{r}
+}
+
+type peopleResolver struct{ *Resolver }
+
+func (r *peopleResolver) FilmConnection(ctx context.Context, obj *People, first *int, after *string) (FilmConnection, error) {
+	from := -1
+	if after != nil {
+		b, err := base64.StdEncoding.DecodeString(*after)
+		if err != nil {
+			return FilmConnection{}, err
+		}
+		i, err := strconv.Atoi(strings.TrimPrefix(string(b), "cursor"))
+		if err != nil {
+			return FilmConnection{}, err
+		}
+		from = i
+	}
+	index := -1
+	count := 0
+	hasPreviousPage := false
+	hasNextPage := true
+	// 获取edges
+	edges := []FilmEdge{}
+	for i, film := range obj.Films {
+		if film.ID == strconv.Itoa(from) {
+			index = i
+		}
+	}
+	if index > 0 {
+		hasPreviousPage = true
+	}
+	for i := index + 1; i < len(obj.Films); i++ {
+		edges = append(edges, FilmEdge{
+			Node:   obj.Films[i],
+			Cursor: encodeCursor(strconv.Itoa(i)),
+		})
+		count++
+		if count >= *first {
+			break
+		}
+	}
+	if count < *first {
+		hasNextPage = false
+	}
+	if count == 0 {
+		return FilmConnection{}, nil
+	}
+	// 获取pageInfo
+	pageInfo := PageInfo{
+		HasPreviousPage: hasPreviousPage,
+		HasNextPage:     hasNextPage,
+		StartCursor:     encodeCursor(edges[0].Node.ID),
+		EndCursor:       encodeCursor(edges[count-1].Node.ID),
+	}
+
+	return FilmConnection{
+		PageInfo:   pageInfo,
+		Edges:      edges,
+		TotalCount: count,
+	}, nil
 }
 
 type queryResolver struct{ *Resolver }

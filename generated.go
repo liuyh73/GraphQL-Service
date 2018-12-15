@@ -31,6 +31,7 @@ type Config struct {
 }
 
 type ResolverRoot interface {
+	People() PeopleResolver
 	Query() QueryResolver
 }
 
@@ -72,20 +73,21 @@ type ComplexityRoot struct {
 	}
 
 	People struct {
-		Id        func(childComplexity int) int
-		Name      func(childComplexity int) int
-		BirthYear func(childComplexity int) int
-		EyeColor  func(childComplexity int) int
-		Gender    func(childComplexity int) int
-		HairColor func(childComplexity int) int
-		Height    func(childComplexity int) int
-		Mass      func(childComplexity int) int
-		SkinColor func(childComplexity int) int
-		Homeworld func(childComplexity int) int
-		Films     func(childComplexity int) int
-		Species   func(childComplexity int) int
-		Starships func(childComplexity int) int
-		Vehicles  func(childComplexity int) int
+		Id             func(childComplexity int) int
+		Name           func(childComplexity int) int
+		BirthYear      func(childComplexity int) int
+		EyeColor       func(childComplexity int) int
+		Gender         func(childComplexity int) int
+		HairColor      func(childComplexity int) int
+		Height         func(childComplexity int) int
+		Mass           func(childComplexity int) int
+		SkinColor      func(childComplexity int) int
+		Homeworld      func(childComplexity int) int
+		Films          func(childComplexity int) int
+		Species        func(childComplexity int) int
+		Starships      func(childComplexity int) int
+		Vehicles       func(childComplexity int) int
+		FilmConnection func(childComplexity int, first *int, after *string) int
 	}
 
 	PeopleConnection struct {
@@ -233,6 +235,9 @@ type ComplexityRoot struct {
 	}
 }
 
+type PeopleResolver interface {
+	FilmConnection(ctx context.Context, obj *People, first *int, after *string) (FilmConnection, error)
+}
 type QueryResolver interface {
 	People(ctx context.Context, id string) (*People, error)
 	Film(ctx context.Context, id string) (*Film, error)
@@ -252,6 +257,40 @@ type QueryResolver interface {
 	VehiclesSearch(ctx context.Context, search string, first *int, after *string) (*VehicleConnection, error)
 	SpeciesSearch(ctx context.Context, search string, first *int, after *string) (*SpecieConnection, error)
 	PlanetsSearch(ctx context.Context, search string, first *int, after *string) (*PlanetConnection, error)
+}
+
+func field_People_filmConnection_args(rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	args := map[string]interface{}{}
+	var arg0 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		var err error
+		var ptr1 int
+		if tmp != nil {
+			ptr1, err = graphql.UnmarshalInt(tmp)
+			arg0 = &ptr1
+		}
+
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		var err error
+		var ptr1 string
+		if tmp != nil {
+			ptr1, err = graphql.UnmarshalID(tmp)
+			arg1 = &ptr1
+		}
+
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	return args, nil
+
 }
 
 func field_Query_people_args(rawArgs map[string]interface{}) (map[string]interface{}, error) {
@@ -1108,6 +1147,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.People.Vehicles(childComplexity), true
+
+	case "People.filmConnection":
+		if e.complexity.People.FilmConnection == nil {
+			break
+		}
+
+		args, err := field_People_filmConnection_args(rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.People.FilmConnection(childComplexity, args["first"].(*int), args["after"].(*string)), true
 
 	case "PeopleConnection.pageInfo":
 		if e.complexity.PeopleConnection.PageInfo == nil {
@@ -2875,6 +2926,7 @@ var peopleImplementors = []string{"People"}
 func (ec *executionContext) _People(ctx context.Context, sel ast.SelectionSet, obj *People) graphql.Marshaler {
 	fields := graphql.CollectFields(ctx, sel, peopleImplementors)
 
+	var wg sync.WaitGroup
 	out := graphql.NewOrderedMap(len(fields))
 	invalid := false
 	for i, field := range fields {
@@ -2917,11 +2969,20 @@ func (ec *executionContext) _People(ctx context.Context, sel ast.SelectionSet, o
 			out.Values[i] = ec._People_starships(ctx, field, obj)
 		case "vehicles":
 			out.Values[i] = ec._People_vehicles(ctx, field, obj)
+		case "filmConnection":
+			wg.Add(1)
+			go func(i int, field graphql.CollectedField) {
+				out.Values[i] = ec._People_filmConnection(ctx, field, obj)
+				if out.Values[i] == graphql.Null {
+					invalid = true
+				}
+				wg.Done()
+			}(i, field)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-
+	wg.Wait()
 	if invalid {
 		return graphql.Null
 	}
@@ -3449,6 +3510,40 @@ func (ec *executionContext) _People_vehicles(ctx context.Context, field graphql.
 	}
 	wg.Wait()
 	return arr1
+}
+
+// nolint: vetshadow
+func (ec *executionContext) _People_filmConnection(ctx context.Context, field graphql.CollectedField, obj *People) graphql.Marshaler {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() { ec.Tracer.EndFieldExecution(ctx) }()
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := field_People_filmConnection_args(rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	rctx := &graphql.ResolverContext{
+		Object: "People",
+		Args:   args,
+		Field:  field,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp := ec.FieldMiddleware(ctx, obj, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.People().FilmConnection(rctx, obj, args["first"].(*int), args["after"].(*string))
+	})
+	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(FilmConnection)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+
+	return ec._FilmConnection(ctx, field.Selections, &res)
 }
 
 var peopleConnectionImplementors = []string{"PeopleConnection"}
@@ -9186,6 +9281,7 @@ type People {
     An array of vehicle resources that this person has piloted.
     """
     vehicles: [Vehicle]
+    filmConnection(first: Int, after: ID): FilmConnection!
 }
 
 """

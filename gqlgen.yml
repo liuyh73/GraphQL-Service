@@ -12,3 +12,6 @@ model:
 resolver:
   filename: resolver.go
   type: Resolver
+models:
+  People:
+    model: github.com/liuyh73/GraphQL-Service.People
